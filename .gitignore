@@ -1,0 +1,10 @@
+/vendor/
+composer.lock
+.phpunit.result.cache
+.DS_Store
+Thumbs.db
+
+# Frontend template archives are NOT stored in git. They are published as
+# GitHub Release assets and downloaded on demand by eoads:install (only the
+# template the developer selects). See stubs/templates/*/template.json.
+stubs/templates/**/*.zip

@@ -1,0 +1,39 @@
+{
+    "name": "eoads/eoads-starter-kit",
+    "description": "EO-ADS Laravel starter kit — full project scaffold with AI-assisted module development",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "ext-zip": "*",
+        "eoads/module-make": "^1.0",
+        "illuminate/console": "^11.0|^12.0",
+        "illuminate/support": "^11.0|^12.0"
+    },
+    "require-dev": {
+        "laravel/framework": "^11.0|^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Eoads\\StarterKit\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Eoads\\StarterKit\\StarterKitServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "post-root-package-install": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ],
+        "post-create-project-cmd": [
+            "@php artisan key:generate --ansi",
+            "@php artisan eoads:install"
+        ]
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
