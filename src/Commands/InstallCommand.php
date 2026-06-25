@@ -855,12 +855,13 @@ MD;
         @unlink($tmp);
 
         // Try each method in turn; the first that lands a non-empty file wins.
-        // Order is chosen for reliability behind corporate networks/AV: the
-        // system curl binary (Windows 10+/macOS/Linux) uses the OS certificate
-        // store and is the most robust, so it leads.
+        // php-curl leads because it renders a clean Symfony progress bar; if it
+        // fails (e.g. a corporate proxy's TLS interception), we fall back to the
+        // system curl binary, which uses the OS certificate store and is the
+        // most robust behind corporate networks/AV (it shows its own bar too).
         $errors = [];
 
-        foreach (['systemCurl', 'phpCurl', 'streamCopy'] as $method) {
+        foreach (['phpCurl', 'systemCurl', 'streamCopy'] as $method) {
             @unlink($tmp);
             $err = $this->{'download' . ucfirst($method)}($url, $tmp);
 
@@ -905,7 +906,7 @@ MD;
         return $code === 0 ? null : ('exit ' . $code);
     }
 
-    /** Download via the PHP cURL extension. */
+    /** Download via the PHP cURL extension, rendering a live Symfony progress bar. */
     private function downloadPhpCurl(string $url, string $tmp): ?string
     {
         if (! function_exists('curl_init')) {
@@ -917,19 +918,45 @@ MD;
             return 'cannot open temp file';
         }
 
+        $bar = null;
+        $progress = function ($ch, $dlTotal, $dlNow) use (&$bar) {
+            if ($dlTotal <= 0) {
+                return 0;
+            }
+
+            if ($bar === null) {
+                $bar = new \Symfony\Component\Console\Helper\ProgressBar($this->output, $dlTotal);
+                $bar->setFormat(' %percent:3s%% [%bar%] %message%');
+                $bar->setMessage(sprintf('0.0 / %.1f MB', $dlTotal / 1048576));
+                $bar->start();
+            }
+
+            $bar->setMessage(sprintf('%.1f / %.1f MB', $dlNow / 1048576, $dlTotal / 1048576));
+            $bar->setProgress((int) $dlNow);
+
+            return 0;
+        };
+
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_FILE           => $fh,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_FAILONERROR    => true,
             CURLOPT_CONNECTTIMEOUT => 30,
-            CURLOPT_TIMEOUT        => 600,
+            CURLOPT_TIMEOUT        => 1800,
             CURLOPT_USERAGENT      => 'eoads-starter-kit',
+            CURLOPT_NOPROGRESS     => false,
+            CURLOPT_PROGRESSFUNCTION => $progress,
         ]);
         $ok  = curl_exec($ch) !== false;
         $msg = $ok ? null : ('cURL error ' . curl_errno($ch) . ': ' . curl_error($ch));
         curl_close($ch);
         fclose($fh);
+
+        if ($bar !== null) {
+            $bar->finish();
+            $this->newLine();
+        }
 
         return $msg;
     }
