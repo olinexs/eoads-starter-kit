@@ -627,6 +627,9 @@ ENV;
         // file (main.ts for TypeScript, main.js for JavaScript).
         $this->publishIndexHtml($tKey);
 
+        // Strip lifecycle scripts that assume the template's original src/ layout.
+        $this->sanitizeFrontendPackageJson();
+
         // Write the .template/ guide for AI agents.
         $this->writeTemplateReadme();
     }
@@ -664,6 +667,48 @@ ENV;
 
         file_put_contents($dest, $content);
         $this->components->twoColumnDetail('<fg=green>CREATE</> frontend/index.html', 'done');
+    }
+
+    /**
+     * The ThemeSelection template's package.json wires a `postinstall` hook
+     * (build:icons + msw:init) that runs `tsx src/plugins/iconify/build-icons.ts`
+     * and an MSW init. Those paths assume the original src/ layout, which we
+     * restructure to resources/js — so npm install aborts in postinstall. Strip
+     * the hook and the broken scripts that back it so install completes.
+     */
+    private function sanitizeFrontendPackageJson(): void
+    {
+        $path = base_path('../frontend/package.json');
+
+        if (! file_exists($path)) {
+            return;
+        }
+
+        $pkg = json_decode(file_get_contents($path), true);
+
+        if (! is_array($pkg) || ! isset($pkg['scripts']) || ! is_array($pkg['scripts'])) {
+            return;
+        }
+
+        $changed = false;
+
+        foreach (['postinstall', 'build:icons', 'msw:init'] as $script) {
+            if (isset($pkg['scripts'][$script])) {
+                unset($pkg['scripts'][$script]);
+                $changed = true;
+            }
+        }
+
+        if (! $changed) {
+            return;
+        }
+
+        file_put_contents(
+            $path,
+            json_encode($pkg, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n"
+        );
+
+        $this->components->twoColumnDetail('<fg=green>PATCH</>  frontend/package.json', 'removed broken postinstall scripts');
     }
 
     private function writeTemplateReadme(): void
