@@ -952,41 +952,49 @@ MD;
             return;
         }
 
-        [$installer, $args] = $this->resolveFrontendInstaller($frontendPath);
+        $attempts = $this->resolveFrontendInstallAttempts($frontendPath);
+        $last     = count($attempts) - 1;
 
-        $this->newLine();
-        $this->components->info("Installing frontend dependencies ({$installer} {$args})...");
+        foreach ($attempts as $i => [$installer, $args]) {
+            $this->newLine();
+            $this->components->info("Installing frontend dependencies ({$installer} {$args})...");
 
-        $command = 'cd ' . escapeshellarg($frontendPath) . " && {$installer} {$args}";
-        passthru($command, $exitCode);
+            $command = 'cd ' . escapeshellarg($frontendPath) . " && {$installer} {$args}";
+            passthru($command, $exitCode);
 
-        if ($exitCode === 0) {
-            $this->components->twoColumnDetail("<fg=green>{$installer} {$args}</>", 'done');
-        } else {
-            $this->components->warn("{$installer} {$args} failed — run it manually in frontend/");
+            if ($exitCode === 0) {
+                $this->components->twoColumnDetail("<fg=green>{$installer} {$args}</>", 'done');
+                return;
+            }
+
+            if ($i < $last) {
+                $this->components->warn("{$installer} {$args} failed — retrying with a non-frozen install...");
+            } else {
+                $this->components->warn("{$installer} {$args} failed — run it manually in frontend/");
+            }
         }
     }
 
     /**
-     * Choose the fastest reproducible install command for the extracted
-     * frontend. The Vuetify templates ship a committed pnpm-lock.yaml, so when
-     * pnpm is available we install from the frozen lockfile (no resolution,
-     * reproducible). If only an npm lockfile is present we use `npm ci` for the
-     * same reason. Otherwise we fall back to a plain `npm install`.
+     * Ordered install attempts for the extracted frontend. We try the fastest
+     * reproducible install first (frozen lockfile), then fall back to a normal
+     * install that reconciles the lock. The Vuetify vendor templates often ship
+     * a package-lock.json that has drifted from package.json (missing icon
+     * packages, version skew), so `npm ci` hard-fails — the fallback recovers.
      *
-     * @return array{0:string,1:string} [installer, args]
+     * @return array<int, array{0:string,1:string}> list of [installer, args]
      */
-    private function resolveFrontendInstaller(string $frontendPath): array
+    private function resolveFrontendInstallAttempts(string $frontendPath): array
     {
         if (file_exists("{$frontendPath}/pnpm-lock.yaml") && $this->commandExists('pnpm')) {
-            return ['pnpm', 'install --frozen-lockfile'];
+            return [['pnpm', 'install --frozen-lockfile'], ['pnpm', 'install']];
         }
 
         if (file_exists("{$frontendPath}/package-lock.json") && $this->commandExists('npm')) {
-            return ['npm', 'ci'];
+            return [['npm', 'ci'], ['npm', 'install']];
         }
 
-        return ['npm', 'install'];
+        return [['npm', 'install']];
     }
 
     private function commandExists(string $command): bool
