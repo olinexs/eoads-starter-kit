@@ -551,6 +551,15 @@ ENV;
 
         // Root-level files (not under src/) → frontend/ root, verbatim.
         if (strpos($relative, 'src/') !== 0) {
+            // index.html and vite.config.* are owned by our stubs
+            // (publishFrontendStubs) and are rewritten for the resources/js
+            // layout. Skip the template's originals so ours are not later
+            // SKIPped as "already exists" — the template's index.html points at
+            // /src/main.ts, which does not exist in our restructured frontend.
+            if (in_array($relative, ['index.html', 'vite.config.js', 'vite.config.ts'], true)) {
+                return null;
+            }
+
             $stats['root']++;
             return $frontendDest . '/' . $relative;
         }
