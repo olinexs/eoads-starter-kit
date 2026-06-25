@@ -441,14 +441,14 @@ ENV;
      * router plugin (from common stubs) replaces it.
      */
     private array $usablePlugins = [
-        '2.pinia.js',
+        '2.pinia',
         'vuetify',
         'iconify',
         // vuetify/index.* imports @/plugins/i18n — keep i18n usable so that
         // cross-reference resolves instead of being dumped into .template/.
         'i18n',
-        'layouts.js',
-        'webfontloader.js',
+        'layouts',
+        'webfontloader',
     ];
 
     private function extractFrontendTemplate(): void
@@ -581,8 +581,11 @@ ENV;
         if (strpos($inner, 'plugins/') === 0) {
             $pluginPath = substr($inner, strlen('plugins/'));
             $segment    = explode('/', $pluginPath)[0];
+            // Single-file plugins differ by language extension (2.pinia.js vs
+            // 2.pinia.ts); compare on the extension-stripped name so both match.
+            $segmentBase = preg_replace('/\.(js|ts)$/', '', $segment);
 
-            if (in_array($segment, $this->usablePlugins, true)) {
+            if (in_array($segmentBase, $this->usablePlugins, true)) {
                 $stats['core']++;
                 return $jsDest . '/plugins/' . $pluginPath;
             }
