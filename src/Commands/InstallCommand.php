@@ -894,11 +894,15 @@ MD;
             return 'curl binary not on PATH';
         }
 
-        $cmd = 'curl -fsSL --retry 3 --connect-timeout 30 -A eoads-starter-kit '
-             . '-o ' . escapeshellarg($tmp) . ' ' . escapeshellarg($url) . ' 2>&1';
-        exec($cmd, $out, $code);
+        // --progress-bar streams a live bar to stderr; passthru() lets it reach
+        // the terminal (exec() would buffer it and the download would look
+        // frozen). --max-time caps a stalled transfer instead of hanging.
+        $cmd = 'curl -fL --progress-bar --retry 3 --connect-timeout 30 --max-time 1800 '
+             . '-A eoads-starter-kit -o ' . escapeshellarg($tmp) . ' ' . escapeshellarg($url);
+        passthru($cmd, $code);
+        $this->newLine();
 
-        return $code === 0 ? null : ('exit ' . $code . ' ' . trim(implode(' ', $out)));
+        return $code === 0 ? null : ('exit ' . $code);
     }
 
     /** Download via the PHP cURL extension. */
