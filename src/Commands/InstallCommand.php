@@ -444,6 +444,9 @@ ENV;
         '2.pinia.js',
         'vuetify',
         'iconify',
+        // vuetify/index.* imports @/plugins/i18n — keep i18n usable so that
+        // cross-reference resolves instead of being dumped into .template/.
+        'i18n',
         'layouts.js',
         'webfontloader.js',
     ];
@@ -630,6 +633,11 @@ ENV;
         // Strip lifecycle scripts that assume the template's original src/ layout.
         $this->sanitizeFrontendPackageJson();
 
+        // iconify/index.* imports ./icons.css, normally produced by the
+        // build:icons step we strip. Provide an empty stub so the import
+        // resolves (icons load at runtime via @iconify/vue).
+        $this->ensureIconifyCssStub();
+
         // Write the .template/ guide for AI agents.
         $this->writeTemplateReadme();
     }
@@ -709,6 +717,28 @@ ENV;
         );
 
         $this->components->twoColumnDetail('<fg=green>PATCH</>  frontend/package.json', 'removed broken postinstall scripts');
+    }
+
+    /**
+     * The iconify plugin's index imports ./icons.css, which is normally emitted
+     * by the build:icons script (removed by sanitizeFrontendPackageJson). Create
+     * an empty stub so Vite can resolve the import; icons still render at runtime
+     * through @iconify/vue.
+     */
+    private function ensureIconifyCssStub(): void
+    {
+        $cssPath = base_path('../frontend/' . $this->srcDir() . '/plugins/iconify/icons.css');
+
+        if (! is_dir(dirname($cssPath))) {
+            return; // iconify plugin wasn't extracted; nothing to stub.
+        }
+
+        if (file_exists($cssPath)) {
+            return;
+        }
+
+        file_put_contents($cssPath, "/* Generated icon CSS is not used; icons load at runtime via @iconify/vue. */\n");
+        $this->components->twoColumnDetail('<fg=green>CREATE</> ' . $this->srcDir() . '/plugins/iconify/icons.css', 'stub');
     }
 
     private function writeTemplateReadme(): void
